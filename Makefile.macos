@@ -1,0 +1,91 @@
+# Mini OS Makefile for macOS (kernel only, no userland)
+
+# 工具链配置
+AS = nasm
+CC = gcc
+LD = ld
+GRUB_MKRESCUE = grub-mkrescue
+
+# 编译标志
+ASFLAGS = -f elf32
+CFLAGS = -m32 -ffreestanding -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -c
+LDFLAGS = -m elf_i386 -T linker.ld
+
+# 目录
+BOOT_DIR = boot
+KERNEL_DIR = kernel
+INCLUDE_DIR = include
+BUILD_DIR = build
+ISO_DIR = iso
+
+# 源文件
+BOOT_SRC = $(BOOT_DIR)/boot.asm
+KERNEL_C_SRC = $(wildcard $(KERNEL_DIR)/*.c) \
+               $(wildcard $(KERNEL_DIR)/memory/*.c) \
+               $(wildcard $(KERNEL_DIR)/process/*.c) \
+               $(wildcard $(KERNEL_DIR)/fs/*.c) \
+               $(wildcard $(KERNEL_DIR)/interrupt/*.c) \
+               $(wildcard $(KERNEL_DIR)/drivers/*.c)
+KERNEL_ASM_SRC = $(wildcard $(KERNEL_DIR)/*.asm) \
+                 $(wildcard $(KERNEL_DIR)/interrupt/*.asm)
+
+# 目标文件
+BOOT_OBJ = $(BUILD_DIR)/$(BOOT_DIR)/boot.o
+KERNEL_C_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_C_SRC))
+KERNEL_ASM_OBJ = $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRC))
+KERNEL_OBJ = $(BOOT_OBJ) $(KERNEL_C_OBJ) $(KERNEL_ASM_OBJ) $(BUILD_DIR)/kernel/gdt_flush.o $(BUILD_DIR)/kernel/panic.o $(BUILD_DIR)/kernel/halt.o $(BUILD_DIR)/kernel/io.o
+
+# 最终目标
+KERNEL_BIN = $(BUILD_DIR)/kernel.bin
+
+.PHONY: all clean dirs
+
+all: dirs $(KERNEL_BIN)
+	@echo "内核编译完成！"
+	@echo "注意：用户程序需要在 Linux 或使用交叉编译工具链编译"
+
+dirs:
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)/$(BOOT_DIR)
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/memory
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/process
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/fs
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/interrupt
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers
+
+# 编译引导代码
+$(BUILD_DIR)/$(BOOT_DIR)/%.o: $(BOOT_DIR)/%.asm
+	$(AS) $(ASFLAGS) $< -o $@
+
+# 编译内核 C 代码
+$(BUILD_DIR)/%.o: %.c
+	$(CC) $(CFLAGS) -I$(INCLUDE_DIR) $< -o $@
+
+# 编译内核汇编代码
+$(BUILD_DIR)/%.o: %.asm
+	$(AS) $(ASFLAGS) $< -o $@
+
+# 链接内核（注意：这一步在 macOS 上会失败）
+$(KERNEL_BIN): $(KERNEL_OBJ)
+	@echo "警告：macOS 的 ld 不支持 32 位 x86 链接"
+	@echo "请使用 Linux 或 Docker 完成构建"
+	@echo "或安装 i386-elf-ld 交叉链接器"
+
+# 清理
+clean:
+	rm -rf $(BUILD_DIR) $(ISO_DIR)
+
+# 帮助信息
+help:
+	@echo "Mini OS 构建系统 (macOS 版本)"
+	@echo ""
+	@echo "可用目标:"
+	@echo "  all     - 编译内核对象文件（链接需要交叉工具链）"
+	@echo "  clean   - 清理构建文件"
+	@echo "  help    - 显示此帮助信息"
+	@echo ""
+	@echo "完整构建需要："
+	@echo "  1. 安装 i386-elf-gcc: brew tap nativeos/i386-elf-toolchain && brew install i386-elf-gcc"
+	@echo "  2. 或使用 Docker: ./build-docker.sh"
+	@echo "  3. 或在 Linux 虚拟机中构建"
