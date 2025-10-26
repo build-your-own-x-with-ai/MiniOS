@@ -4,6 +4,12 @@
 
 ---
 
+## Screenshots
+
+![MiniOS](./Screenshots/MiniOS.png)
+
+![App](./Screenshots/App.png)
+
 <a name="english"></a>
 ## English
 
